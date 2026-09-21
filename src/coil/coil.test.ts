@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { computeCoil } from "./computeCoil.ts"
+import { detectSqueeze } from "./squeeze.ts"
 import { emptyDeskCard, parseQuery, toDeskCard } from "./schema.ts"
 import { sessionAt, sessionTag } from "./session.ts"
-import type { Bar, VenuePack } from "./types.ts"
+import { WEIGHTS, type Bar, type VenuePack } from "./types.ts"
 import { makeDemoPack } from "../lib/venues/demo.ts"
 import { defaultVenueOf, sortPits, type PitRow } from "../lib/venues/catalog.ts"
 
@@ -148,6 +149,124 @@ describe("computeCoil", () => {
     assert.equal(base.score, withG.score)
     assert.equal(base.components.spotLead, withG.components.spotLead)
   })
+
+  it("fundingPct 0.12, ls 0.9, oiZ 1.6, spot leads vs shorts → armed short", () => {
+    const fundingHistory = Array.from({ length: 50 }, (_, i) => -0.001 + i * 0.0001)
+    const oiHistory30d = Array.from({ length: 30 }, () => 1_000_000_000)
+    oiHistory30d[29] = 1_200_000_000
+    const snap = computeCoil({
+      symbol: "BTC",
+      interval: "5m",
+      window: 48,
+      venue: "okx",
+      pack: pack({
+        funding: -0.0005,
+        fundingHistory,
+        lsAccount: 0.9,
+        lsTop: 0.8,
+        oiUsd: 1_200_000_000,
+        oiHistory30d,
+        historyDays: 30,
+        oiRising: true,
+      }),
+    })
+    assert.equal(snap.model, "COIL-1.1")
+    assert.equal(snap.squeeze.side, "short")
+    assert.equal(snap.squeeze.armed, true)
+    assert.equal(snap.squeeze.watch, true)
+    assert.equal(snap.regime, "squeeze_armed")
+    assert.equal(snap.spotLeadsAgainstCrowd, true)
+  })
+
+  it("demo source never presents a live squeeze", () => {
+    const demo = makeDemoPack("BTC", "5m", 48, Date.parse("2026-09-17T12:00:00Z"))
+    const snap = computeCoil({
+      symbol: "BTC",
+      interval: "5m",
+      window: 48,
+      venue: "binance",
+      pack: demo,
+    })
+    assert.equal(snap.source, "demo")
+    assert.equal(snap.squeeze.side, "none")
+    assert.equal(snap.squeeze.watch, false)
+    assert.equal(snap.squeeze.armed, false)
+  })
+})
+
+describe("detectSqueeze", () => {
+  const liveBase = {
+    source: "live" as const,
+    historyDays: 30,
+    lsAccount: 0.9,
+    lsTop: 0.8,
+    oiRising: false as boolean | null,
+    spotLeadsAgainstCrowd: true,
+  }
+
+  it("fundingPct 0.12, lsAccount 0.9, oiZ 1.6, spot leads vs shorts → armed short", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.side, "short")
+    assert.equal(read.watch, true)
+    assert.equal(read.armed, true)
+  })
+
+  it("same but oiZ 1.1 and not rising → watch, not armed", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      oiZ: 1.1,
+      oiRising: false,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.side, "short")
+    assert.equal(read.watch, true)
+    assert.equal(read.armed, false)
+  })
+
+  it("fundingPct 0.12 but both L/S series long-crowded → no short crowd", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      lsAccount: 2.4,
+      lsTop: 3.0,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.side, "none")
+    assert.equal(read.watch, false)
+    assert.equal(read.armed, false)
+  })
+
+  it("history < 10d → watch/armed false", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      historyDays: 4,
+      fundingPct: 0.12,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.watch, false)
+    assert.equal(read.armed, false)
+    assert.equal(read.side, "none")
+    assert.equal(read.oiZ, null)
+    assert.equal(read.fundingPct, null)
+  })
+})
+
+describe("weights", () => {
+  it("layer weights still sum to 1.00", () => {
+    const sum = WEIGHTS.crowd + WEIGHTS.fuel + WEIGHTS.spotLead + WEIGHTS.thinSession + WEIGHTS.mmFlow
+    assert.equal(Number(sum.toFixed(2)), 1)
+  })
 })
 
 describe("parseQuery", () => {
@@ -213,6 +332,9 @@ describe("desk card", () => {
     assert.equal(card.venue, "okx")
     assert.equal(card.symbol, "BTC")
     assert.equal(card.interval, "5m")
+    assert.equal(typeof card.squeezeWatch, "boolean")
+    assert.equal(typeof card.squeezeArmed, "boolean")
+    assert.ok(card.squeezeSide === "short" || card.squeezeSide === "long" || card.squeezeSide === "none")
   })
 
   it("missing fields render as null, not a crash", () => {
@@ -226,6 +348,9 @@ describe("desk card", () => {
     assert.equal(card.session, null)
     assert.equal(card.source, null)
     assert.equal(card.venue, null)
+    assert.equal(card.squeezeSide, null)
+    assert.equal(card.squeezeWatch, null)
+    assert.equal(card.squeezeArmed, null)
     const empty = emptyDeskCard({ symbol: "ETH" })
     assert.equal(empty.symbol, "ETH")
     assert.equal(empty.score, null)

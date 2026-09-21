@@ -63,3 +63,28 @@ export function num(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN
   return Number.isFinite(n) ? n : null
 }
+
+export function overlayTakerPct(
+  bars: Bar[],
+  spotPctByT: Map<number, number>,
+  perpPctByT: Map<number, number>,
+): Bar[] {
+  if (!spotPctByT.size && !perpPctByT.size) return bars
+  const times = bars.map((b) => b.t)
+  const spotPct = nearestFill(spotPctByT, times)
+  const perpPct = nearestFill(perpPctByT, times)
+  return bars.map((bar) => {
+    const s = spotPct.get(bar.t)
+    const p = perpPct.get(bar.t)
+    const next = { ...bar }
+    if (s !== undefined && s >= 0 && s <= 1) {
+      next.spotTakerBuy = bar.spotVol * s
+      next.spotTakerSell = bar.spotVol * (1 - s)
+    }
+    if (p !== undefined && p >= 0 && p <= 1) {
+      next.perpTakerBuy = bar.perpVol * p
+      next.perpTakerSell = bar.perpVol * (1 - p)
+    }
+    return next
+  })
+}

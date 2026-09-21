@@ -10,6 +10,7 @@ import {
   type DeskCard,
   type Regime,
   type Source,
+  type SqueezeSide,
 } from "./types.ts"
 
 export const QuerySchema = z.object({
@@ -24,6 +25,7 @@ export const QuerySchema = z.object({
 const REGIMES: readonly Regime[] = ["quiet", "squeeze_watch", "squeeze_armed"]
 const CROWDS: readonly CrowdSide[] = ["short", "long", "mixed"]
 const SOURCES: readonly Source[] = ["demo", "live"]
+const SQUEEZE_SIDES: readonly SqueezeSide[] = ["short", "long", "none"]
 
 export const DeskCardSchema = z.object({
   score: z.number().nullable(),
@@ -37,6 +39,11 @@ export const DeskCardSchema = z.object({
   venue: z.string().nullable(),
   symbol: z.string().nullable(),
   interval: z.string().nullable(),
+  squeezeSide: z.enum(["short", "long", "none"]).nullable(),
+  squeezeWatch: z.boolean().nullable(),
+  squeezeArmed: z.boolean().nullable(),
+  fundingPct: z.number().nullable(),
+  oiZ: z.number().nullable(),
 })
 
 export function parseQuery(url: URL) {
@@ -78,6 +85,11 @@ export function emptyDeskCard(q?: { symbol?: string; interval?: string; venue?: 
     venue: strOrNull(q?.venue),
     symbol: strOrNull(q?.symbol) ?? "BTC",
     interval: strOrNull(q?.interval) ?? "5m",
+    squeezeSide: null,
+    squeezeWatch: null,
+    squeezeArmed: null,
+    fundingPct: null,
+    oiZ: null,
   }
 }
 
@@ -87,6 +99,8 @@ export function toDeskCard(s: Partial<CoilSnapshot> | Record<string, unknown> | 
   const sourceRaw = rec.source
   const regimeRaw = rec.regime
   const crowdRaw = rec.crowdSide
+  const squeeze = rec.squeeze && typeof rec.squeeze === "object" ? rec.squeeze as Record<string, unknown> : rec
+  const squeezeSideRaw = squeeze.side ?? rec.squeezeSide
   return {
     score: numOrNull(rec.score),
     regime: REGIMES.includes(regimeRaw as Regime) ? (regimeRaw as Regime) : null,
@@ -99,6 +113,11 @@ export function toDeskCard(s: Partial<CoilSnapshot> | Record<string, unknown> | 
     venue: strOrNull(rec.venue),
     symbol: strOrNull(rec.symbol),
     interval: strOrNull(rec.interval),
+    squeezeSide: SQUEEZE_SIDES.includes(squeezeSideRaw as SqueezeSide) ? (squeezeSideRaw as SqueezeSide) : null,
+    squeezeWatch: boolOrNull(squeeze.watch ?? rec.squeezeWatch),
+    squeezeArmed: boolOrNull(squeeze.armed ?? rec.squeezeArmed),
+    fundingPct: numOrNull(squeeze.fundingPct ?? rec.fundingPct),
+    oiZ: numOrNull(squeeze.oiZ ?? rec.oiZ),
   }
 }
 
@@ -106,14 +125,15 @@ export function exportEnvelope(query: unknown, snapshot: CoilSnapshot, fetchedAt
   const card = toDeskCard(snapshot)
   return {
     api: "coil-export",
-    version: "1.0",
-    model: "COIL-1.0",
+    version: "1.1",
+    model: "COIL-1.1",
     fetchedAt,
     query,
     readme: {
       score: "0–100 crowd/squeeze setup strength. Not mixed with Gravity G or ANVIL A. Not P(next candle).",
       bias: "[-1,+1]. Negative = long crowd vulnerable. Positive = short crowd vulnerable.",
-      regime: "quiet | squeeze_watch | squeeze_armed",
+      regime: "squeeze_armed only if squeeze.armed. Else squeeze_watch if squeeze.watch or score≥35. Else quiet.",
+      squeeze: "Flags from 30d funding percentile, L/S, OI z. Not an order.",
       source: "live = real tape. demo = synthetic. Never a venue id.",
       mmFlow: "Inventory transfers, not proven intent. Weight cap 10%.",
       gravity: "Optional sibling snapshot. Not mixed into COIL score.",

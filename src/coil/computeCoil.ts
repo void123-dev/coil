@@ -1,4 +1,5 @@
 import { WEIGHTS, type CoilSnapshot, type CrowdSide, type GravityHint, type MmEvent, type Regime, type Source, type VenuePack } from "./types.ts"
+import { detectSqueeze, regimeOf, squeezeHeadline } from "./squeeze.ts"
 import { basisBps, clamp, mean, percentileRank, takerBuyPct, zScore } from "./math.ts"
 import { sessionAt } from "./session.ts"
 
@@ -42,17 +43,6 @@ function mmLayer(events: MmEvent[], side: CrowdSide, symbol: string) {
   const aligned =
     (side === "short" && deposits) || (side === "long" && deposits)
   return aligned ? clamp(Math.log10(Math.max(usd, 1)) / 8) : 0.05
-}
-
-function headline(side: CrowdSide, session: string, regime: Regime, score: number, spotLead: boolean) {
-  const crowd = side === "short" ? "Short crowd" : side === "long" ? "Long crowd" : "Mixed books"
-  const lead = spotLead ? "spot leading" : "spot not leading"
-  const en = `${crowd} · ${lead} · ${session.replace("_", " ")} · ${regime.replace("squeeze_", "")} ${Math.round(score)}`
-  const ruCrowd = side === "short" ? "Толпа в шорте" : side === "long" ? "Толпа в лонге" : "Смешанные книги"
-  const ruLead = spotLead ? "спот ведет" : "спот не ведет"
-  const ruReg = regime === "squeeze_armed" ? "заряд" : regime === "squeeze_watch" ? "наблюдение" : "тихо"
-  const ru = `${ruCrowd} · ${ruLead} · ${session} · ${ruReg} ${Math.round(score)}`
-  return { en, ru }
 }
 
 export function computeCoil(opts: {
@@ -102,16 +92,34 @@ export function computeCoil(opts: {
     0, 100,
   )
   const bias = side === "short" ? components.crowd : side === "long" ? -components.crowd : 0
-  const regime: Regime = score >= 60 ? "squeeze_armed" : score >= 35 ? "squeeze_watch" : "quiet"
   const spotLeadsAgainstCrowd =
     (side === "short" && (spotFlow ?? 0) >= 0.52) || (side === "long" && (spotFlow ?? 1) <= 0.48)
+  const lookbackOi = opts.pack.oiHistory30d?.length ? opts.pack.oiHistory30d : []
+  const historyDays = opts.pack.historyDays ?? null
+  const squeezeOiZ = lookbackOi.length >= 10 ? zScore(oiNow, lookbackOi) : null
+  const squeezeFundPct = fundingPct
+  const squeeze = detectSqueeze({
+    source,
+    historyDays,
+    fundingPct: squeezeFundPct,
+    lsAccount: opts.pack.lsAccount,
+    lsTop: opts.pack.lsTop,
+    oiZ: squeezeOiZ,
+    oiRising: opts.pack.oiRising ?? null,
+    spotLeadsAgainstCrowd,
+    pxNow: last?.spot ?? 0,
+    pxThen: first?.spot ?? 0,
+    oiNow,
+    oiThen: bars[0]?.oiUsd || oiSeries[0] || null,
+  })
+  const regime: Regime = regimeOf(score, squeeze)
   const conf = clamp(
     (Number(fundingPct !== null) + Number(opts.pack.lsAccount !== null) + Number(oiZ !== null) + Number(spotFlow !== null)) / 4,
   )
-  const { en, ru } = headline(side, session.label, regime, score, spotLeadsAgainstCrowd)
+  const { en, ru } = squeezeHeadline(squeeze, side, spotLeadsAgainstCrowd)
 
   return {
-    model: "COIL-1.0",
+    model: "COIL-1.1",
     symbol: opts.symbol, interval: opts.interval, window: opts.window, venue: opts.venue,
     source, asOf: last?.t ?? now, session, score, bias, regime, crowdSide: side,
     confidence: conf, headline: en, headlineRu: ru, components, weights: WEIGHTS,
@@ -124,6 +132,7 @@ export function computeCoil(opts: {
     spotVolRel: avgSpot ? (last?.spotVol ?? 0) / avgSpot : 1,
     perpVolRel: avgPerp ? (last?.perpVol ?? 0) / avgPerp : 1,
     spotLeadsAgainstCrowd, thinTape: session.thin,
+    squeeze,
     mmFlow: { status: mmStatus === "disabled" ? "disabled" : events.length ? mmStatus : "empty", events },
     gravity: opts.gravity ?? { available: false },
     series: bars.map((b) => ({

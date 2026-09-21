@@ -43,13 +43,13 @@ export function snapshotToCsv(snapshot: CoilSnapshot): string {
 
 export const EXPORT_SCHEMA = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
-  title: "COIL-1.0 export envelope",
+  title: "COIL-1.1 export envelope",
   type: "object",
   required: ["api", "snapshot"],
   properties: {
     api: { const: "coil-export" },
-    version: { const: "1.0" },
-    model: { const: "COIL-1.0" },
+    version: { const: "1.1" },
+    model: { const: "COIL-1.1" },
     fetchedAt: { type: "number" },
     query: {
       type: "object",
@@ -78,7 +78,7 @@ export const EXPORT_SCHEMA = {
       type: "object",
       required: ["source", "venue", "symbol", "interval", "score", "regime", "crowdSide", "bias", "spotLeadsAgainstCrowd", "thinTape", "session"],
       properties: {
-        model: { const: "COIL-1.0" },
+        model: { const: "COIL-1.1" },
         score: { type: ["number", "null"], minimum: 0, maximum: 100 },
         bias: { type: ["number", "null"], minimum: -1, maximum: 1 },
         regime: { enum: ["quiet", "squeeze_watch", "squeeze_armed", null] },

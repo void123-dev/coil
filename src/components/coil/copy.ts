@@ -39,13 +39,19 @@ export const COPY = {
     live: "live",
     demo: "demo",
     footer:
-      "Crowd and squeeze. Not the next candle. COIL-1.0 weights: crowd 30% · fuel 25% · spot-lead 20% · thin-session 15% · mm-flow 10%.",
+      "Crowd and squeeze. Not the next candle. COIL-1.1 flags from funding percentile, L/S, OI z. Not an order. Weights: crowd 30% · fuel 25% · spot-lead 20% · thin-session 15% · mm-flow 10%.",
     loading: "Reading the tape…",
     error: "Desk feed unavailable. Retrying.",
     shortVulnerable: "short crowd vulnerable",
     longVulnerable: "long crowd vulnerable",
     leading: "spot leading against crowd",
     notLeading: "spot not leading",
+    squeeze: "Squeeze",
+    squeezeSide: "side",
+    oiDelta: "OI Δ",
+    covering: "covering",
+    notCovering: "not covering",
+    oiRising: "OI rising",
   },
   ru: {
     tagline: "Толпа и сквиз. Не прогноз следующей свечи.",
@@ -83,13 +89,19 @@ export const COPY = {
     live: "живой",
     demo: "демо",
     footer:
-      "Толпа и сквиз. Не прогноз следующей свечи. COIL-1.0: толпа 30% · топливо 25% · спот-лид 20% · тонкая сессия 15% · поток MM 10%.",
+      "Толпа и сквиз. Не прогноз следующей свечи. Флаги COIL-1.1: перцентиль фандинга, L/S, OI z. Не заявка. Веса: толпа 30% · топливо 25% · спот-лид 20% · тонкая сессия 15% · поток MM 10%.",
     loading: "Чтение ленты…",
     error: "Лента недоступна. Повтор.",
     shortVulnerable: "шорт-толпа уязвима",
     longVulnerable: "лонг-толпа уязвима",
     leading: "спот ведёт против толпы",
     notLeading: "спот не ведёт",
+    squeeze: "Сквиз",
+    squeezeSide: "сторона",
+    oiDelta: "OI Δ",
+    covering: "закрытие",
+    notCovering: "без закрытия",
+    oiRising: "OI растёт",
   },
 } as const
 
@@ -101,6 +113,16 @@ export const REGIME_LABEL: Record<Lang, Record<Regime, string>> = {
 export const CROWD_LABEL: Record<Lang, Record<CrowdSide, string>> = {
   en: { short: "short crowd", long: "long crowd", mixed: "mixed books" },
   ru: { short: "толпа в шорте", long: "толпа в лонге", mixed: "смешанные книги" },
+}
+
+export const SQUEEZE_FLAG: Record<Lang, Record<"none" | "watch" | "armed", string>> = {
+  en: { none: "none", watch: "watch", armed: "armed" },
+  ru: { none: "нет", watch: "наблюдение", armed: "заряд" },
+}
+
+export const SQUEEZE_SIDE: Record<Lang, Record<"short" | "long" | "none", string>> = {
+  en: { short: "short", long: "long", none: "none" },
+  ru: { short: "шорт", long: "лонг", none: "нет" },
 }
 
 export const SESSION_LABEL: Record<Lang, Record<SessionLabel, string>> = {

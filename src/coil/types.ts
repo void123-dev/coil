@@ -13,6 +13,20 @@ export type SessionLabel =
 export type CrowdSide = "short" | "long" | "mixed"
 export type Regime = "quiet" | "squeeze_watch" | "squeeze_armed"
 export type Source = "demo" | "live"
+export type SqueezeSide = "short" | "long" | "none"
+
+export type SqueezeRead = {
+  side: SqueezeSide
+  watch: boolean
+  armed: boolean
+  fundingPct: number | null
+  lsAccount: number | null
+  lsTop: number | null
+  oiZ: number | null
+  oiRising: boolean | null
+  covering: boolean
+  historyDays: number | null
+}
 
 export type Bar = {
   t: number
@@ -37,6 +51,9 @@ export type VenuePack = {
   lsAccount: number | null // longs/shorts, 1 = balanced, >1 more longs
   lsTop: number | null
   source: "live" | "demo"
+  oiHistory30d?: number[]
+  historyDays?: number | null
+  oiRising?: boolean | null
 }
 
 export type GravityHint = {
@@ -67,7 +84,7 @@ export type CoilComponents = {
 }
 
 export type CoilSnapshot = {
-  model: "COIL-1.0"
+  model: "COIL-1.1"
   symbol: SymbolId
   interval: Interval
   window: number
@@ -101,6 +118,7 @@ export type CoilSnapshot = {
   perpVolRel: number
   spotLeadsAgainstCrowd: boolean
   thinTape: boolean
+  squeeze: SqueezeRead
   mmFlow: { status: "disabled" | "demo" | "live" | "empty"; events: MmEvent[] }
   gravity: GravityHint
   series: Array<{
@@ -124,4 +142,9 @@ export type DeskCard = {
   venue: string | null
   symbol: string | null
   interval: string | null
+  squeezeSide: SqueezeSide | null
+  squeezeWatch: boolean | null
+  squeezeArmed: boolean | null
+  fundingPct: number | null
+  oiZ: number | null
 }

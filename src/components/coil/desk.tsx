@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { INTERVALS, SYMBOLS, VENUES, WEIGHTS, WINDOWS, type CoilSnapshot, type Interval, type SymbolId, type Venue } from "@/coil/types.ts"
 import { cn } from "@/lib/utils.ts"
 import type { VenuesPayload } from "@/lib/venues/catalog.ts"
-import { COPY, CROWD_LABEL, REGIME_LABEL, SESSION_LABEL, WEIGHT_LABEL, type Lang } from "./copy.ts"
+import { COPY, CROWD_LABEL, REGIME_LABEL, SESSION_LABEL, SQUEEZE_FLAG, SQUEEZE_SIDE, WEIGHT_LABEL, type Lang } from "./copy.ts"
 import { CoilCharts } from "./charts.tsx"
 import { fmtBps, fmtFunding, fmtPct, fmtPrice, fmtTime, fmtUsd, fmtZ } from "./format.ts"
 import { useEffect, useMemo, useState } from "react"
@@ -102,6 +102,40 @@ function Pill({
     <span className={cn("inline-flex h-7 items-center rounded-full border px-2.5 text-[11px] font-medium uppercase tracking-wider", cls)}>
       {children}
     </span>
+  )
+}
+
+function SqueezeStrip({ snap, lang }: { snap: CoilSnapshot; lang: Lang }) {
+  const copy = COPY[lang]
+  const flag = snap.squeeze.armed ? "armed" : snap.squeeze.watch ? "watch" : "none"
+  const lsAcc = snap.squeeze.lsAccount
+  const lsTop = snap.squeeze.lsTop
+  const ls = [lsAcc === null ? null : `${lsAcc.toFixed(2)} acc`, lsTop === null ? null : `${lsTop.toFixed(2)} top`]
+    .filter(Boolean)
+    .join("  ·  ")
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums text-muted sm:grid-cols-5">
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{copy.squeeze}</div>
+        <div className="text-fg">{SQUEEZE_FLAG[lang][flag]}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{copy.squeezeSide}</div>
+        <div className="text-fg">{SQUEEZE_SIDE[lang][snap.squeeze.side]}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{copy.percentile}</div>
+        <div className="text-fg">{fmtPct(snap.squeeze.fundingPct, 0)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">OI z</div>
+        <div className="text-fg">{fmtZ(snap.squeeze.oiZ)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">L/S</div>
+        <div className="text-fg">{ls || "—"}</div>
+      </div>
+    </div>
   )
 }
 
@@ -335,6 +369,7 @@ function Hero({
               {snap.spotLeadsAgainstCrowd ? copy.leading : copy.notLeading}
             </Pill>
           </div>
+          <SqueezeStrip snap={snap} lang={lang} />
           <p className="text-base text-fg">{lang === "ru" ? snap.headlineRu : snap.headline}</p>
           <div>
             <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wider text-subtle">
@@ -368,7 +403,12 @@ function Metrics({ snap, lang }: { snap: CoilSnapshot; lang: Lang }) {
       <Metric label={copy.funding} value={fmtFunding(snap.funding)} hint={snap.fundingPercentile === null ? undefined : `${copy.percentile} ${fmtPct(snap.fundingPercentile, 0)}`} />
       <Metric label={copy.lsAccount} value={snap.lsAccount === null ? "—" : snap.lsAccount.toFixed(2)} />
       <Metric label={copy.lsTop} value={snap.lsTop === null ? "—" : snap.lsTop.toFixed(2)} />
-      <Metric label={copy.oi} value={fmtUsd(snap.oiUsd)} hint={fmtZ(snap.oiZ)} />
+      <Metric label={copy.oi} value={fmtUsd(snap.oiUsd)} hint={fmtZ(snap.squeeze.oiZ ?? snap.oiZ)} />
+      <Metric
+        label={copy.squeeze}
+        value={SQUEEZE_FLAG[lang][snap.squeeze.armed ? "armed" : snap.squeeze.watch ? "watch" : "none"]}
+        hint={snap.squeeze.side === "none" ? undefined : SQUEEZE_SIDE[lang][snap.squeeze.side]}
+      />
       <Metric label={copy.basis} value={fmtBps(snap.basisBps)} />
       <Metric label={copy.spotTaker} value={fmtPct(snap.spotTakerBuyPct)} />
       <Metric label={copy.perpTaker} value={fmtPct(snap.perpTakerBuyPct)} />

@@ -1,10 +1,10 @@
 import { computeCoil } from "../coil/computeCoil.ts"
+import { regimeOf } from "../coil/squeeze.ts"
 import { emptyDeskCard, parseQuery, toDeskCard } from "../coil/schema.ts"
 import {
   SYMBOLS,
   type CoilSnapshot,
   type Interval,
-  type Regime,
   type Source,
   type SymbolId,
   type Venue,
@@ -81,12 +81,11 @@ function applyMedian(
   score: number,
   bias: number,
 ): CoilSnapshot {
-  const regime: Regime = score >= 60 ? "squeeze_armed" : score >= 35 ? "squeeze_watch" : "quiet"
   return {
     ...snap,
     score,
     bias,
-    regime,
+    regime: regimeOf(score, snap.squeeze),
     series: snap.series.map((row) => ({ ...row, score, bias })),
   }
 }

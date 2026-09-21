@@ -1,4 +1,4 @@
-# COIL 1.0
+# COIL 1.1
 
 **Crowd and squeeze. Not the next candle.**
 
@@ -40,11 +40,11 @@ bias  ∈ [-1, +1]
         − long  crowd vulnerable
 ```
 
-| Regime | Score |
+| Regime | When |
 | --- | --- |
-| `quiet` | `< 35` |
-| `squeeze_watch` | `35–59` |
-| `squeeze_armed` | `≥ 60` |
+| `quiet` | no squeeze flag and score `< 35` |
+| `squeeze_watch` | `squeeze.watch` or score `≥ 35` |
+| `squeeze_armed` | **only** `squeeze.armed` (funding percentile + L/S + OI z + spot lead) |
 
 `mmFlow` is `0` when the inventory adapter is off. Gravity unavailable does **not** zero the score, and Gravity G is **not** mixed into the weights.
 
@@ -62,7 +62,7 @@ GET $COIL_API_BASE/api/venues
 
 Card fields (root **or** under `snapshot` / `card`):
 
-`score` · `regime` · `crowdSide` · `bias` · `spotLeadsAgainstCrowd` · `thinTape` · `session` · `source` · `venue` · `symbol` · `interval`
+`score` · `regime` · `crowdSide` · `bias` · `spotLeadsAgainstCrowd` · `thinTape` · `session` · `source` · `venue` · `symbol` · `interval` · `squeezeSide` · `squeezeWatch` · `squeezeArmed` · `fundingPct` · `oiZ`
 
 Missing fields render as `null`, never as an HTML error page.
 
