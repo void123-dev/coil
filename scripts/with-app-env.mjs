@@ -104,13 +104,54 @@ export function isMainModule(moduleUrl) {
   }
 }
 
+function parseDotEnv(text) {
+  const env = {}
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line.startsWith("#")) continue
+    const cut = line.indexOf("=")
+    if (cut <= 0) continue
+    const key = line.slice(0, cut).trim()
+    let value = line.slice(cut + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    if (key) env[key] = value
+  }
+  return env
+}
+
+/** `.env` then `.env.local`. Existing process env wins. Not a VITE_ secret store. */
+export function mergeDotEnvFiles(root, processEnv) {
+  const merged = { ...processEnv }
+  for (const name of [".env", ".env.local"]) {
+    let text = ""
+    try {
+      text = readFileSync(join(root, name), "utf8")
+    } catch {
+      continue
+    }
+    const parsed = parseDotEnv(text)
+    for (const [key, value] of Object.entries(parsed)) {
+      if (merged[key] === undefined || merged[key] === "") merged[key] = value
+    }
+  }
+  return merged
+}
+
 function main(argv) {
   const [command, ...args] = argv;
   if (!command) {
     console.error("usage: node scripts/with-app-env.mjs <command> [args…]");
     process.exit(2);
   }
-  const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  const env = mergeDotEnvFiles(
+    projectRoot(),
+    mergeAppEnv(readAppEnv(projectRoot()), process.env),
+  )
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {

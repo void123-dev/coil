@@ -75,11 +75,24 @@ Full contract: [docs/API.md](docs/API.md).
 ## Quick start
 
 ```bash
+git clone https://github.com/void123-dev/coil.git
+cd coil
 npm install
-npm run dev
+cp .env.example .env
 npm test
 npm run typecheck
+npm run dev
 ```
+
+`npm run dev` serves the desk (Vite, host `0.0.0.0`, port `8080`). Live tape is OKX. Binance/Bybit fall back to demo if their public books fail. Squeeze flags, whale `lsPosition`, and the desk UI work without CoinGlass.
+
+To test the liquidation magnet overlay, put a **CoinGlass v4 Professional+** key in `.env`:
+
+```
+COINGLASS_API_KEY=your_key
+```
+
+Restart `npm run dev`. Unset key → chip `liq: no CoinGlass key`, score unchanged. Do not scrape CoinGlass HTML. Do not commit `.env`.
 
 Query defaults: `symbol=BTC`, `interval=5m`, `window=48`. If `venue` is omitted, COIL picks the first live pit from the catalog.
 
