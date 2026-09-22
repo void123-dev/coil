@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { computeCoil } from "./computeCoil.ts"
-import { detectSqueeze } from "./squeeze.ts"
+import { crowdDisagrees, detectSqueeze } from "./squeeze.ts"
 import { emptyDeskCard, parseQuery, toDeskCard } from "./schema.ts"
 import { sessionAt, sessionTag } from "./session.ts"
 import { WEIGHTS, type Bar, type VenuePack } from "./types.ts"
@@ -176,6 +176,36 @@ describe("computeCoil", () => {
     assert.equal(snap.squeeze.watch, true)
     assert.equal(snap.regime, "squeeze_armed")
     assert.equal(snap.spotLeadsAgainstCrowd, true)
+    assert.equal(snap.squeeze.crowdDisagrees, false)
+  })
+
+  it("whale position long vs short accounts keeps watch and blocks armed", () => {
+    const fundingHistory = Array.from({ length: 50 }, (_, i) => -0.001 + i * 0.0001)
+    const oiHistory30d = Array.from({ length: 30 }, () => 1_000_000_000)
+    oiHistory30d[29] = 1_200_000_000
+    const snap = computeCoil({
+      symbol: "BTC",
+      interval: "5m",
+      window: 48,
+      venue: "okx",
+      pack: pack({
+        funding: -0.0005,
+        fundingHistory,
+        lsAccount: 0.88,
+        lsTop: 0.81,
+        lsPosition: 2.23,
+        oiUsd: 1_200_000_000,
+        oiHistory30d,
+        historyDays: 30,
+        oiRising: true,
+      }),
+    })
+    assert.equal(snap.squeeze.side, "short")
+    assert.equal(snap.squeeze.watch, true)
+    assert.equal(snap.squeeze.armed, false)
+    assert.equal(snap.squeeze.crowdDisagrees, true)
+    assert.equal(snap.regime, "squeeze_watch")
+    assert.match(snap.headline, /whale book long/i)
   })
 
   it("demo source never presents a live squeeze", () => {
@@ -200,6 +230,7 @@ describe("detectSqueeze", () => {
     historyDays: 30,
     lsAccount: 0.9,
     lsTop: 0.8,
+    lsPosition: null as number | null,
     oiRising: false as boolean | null,
     spotLeadsAgainstCrowd: true,
   }
@@ -259,6 +290,56 @@ describe("detectSqueeze", () => {
     assert.equal(read.side, "none")
     assert.equal(read.oiZ, null)
     assert.equal(read.fundingPct, null)
+  })
+
+  it("accounts short + whale position 2.23 → watch, not armed", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      lsPosition: 2.23,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.side, "short")
+    assert.equal(read.watch, true)
+    assert.equal(read.armed, false)
+    assert.equal(read.crowdDisagrees, true)
+  })
+
+  it("accounts short + whale position 0.70 → still armed", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      lsPosition: 0.7,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.side, "short")
+    assert.equal(read.armed, true)
+    assert.equal(read.crowdDisagrees, false)
+  })
+
+  it("lsPosition null does not block armed", () => {
+    const read = detectSqueeze({
+      ...liveBase,
+      fundingPct: 0.12,
+      lsPosition: null,
+      oiZ: 1.6,
+      oiRising: true,
+      spotLeadsAgainstCrowd: true,
+    })
+    assert.equal(read.armed, true)
+    assert.equal(read.crowdDisagrees, false)
+  })
+})
+
+describe("crowdDisagrees", () => {
+  it("short accounts vs long whale book", () => {
+    assert.equal(crowdDisagrees(0.88, 0.81, 2.23), true)
+    assert.equal(crowdDisagrees(0.88, 0.81, 0.7), false)
+    assert.equal(crowdDisagrees(0.88, 0.81, null), false)
   })
 })
 
@@ -335,6 +416,7 @@ describe("desk card", () => {
     assert.equal(typeof card.squeezeWatch, "boolean")
     assert.equal(typeof card.squeezeArmed, "boolean")
     assert.ok(card.squeezeSide === "short" || card.squeezeSide === "long" || card.squeezeSide === "none")
+    assert.equal(card.crowdDisagrees, false)
   })
 
   it("missing fields render as null, not a crash", () => {
@@ -351,6 +433,8 @@ describe("desk card", () => {
     assert.equal(card.squeezeSide, null)
     assert.equal(card.squeezeWatch, null)
     assert.equal(card.squeezeArmed, null)
+    assert.equal(card.lsPosition, null)
+    assert.equal(card.crowdDisagrees, null)
     const empty = emptyDeskCard({ symbol: "ETH" })
     assert.equal(empty.symbol, "ETH")
     assert.equal(empty.score, null)

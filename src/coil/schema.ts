@@ -44,6 +44,8 @@ export const DeskCardSchema = z.object({
   squeezeArmed: z.boolean().nullable(),
   fundingPct: z.number().nullable(),
   oiZ: z.number().nullable(),
+  lsPosition: z.number().nullable(),
+  crowdDisagrees: z.boolean().nullable(),
 })
 
 export function parseQuery(url: URL) {
@@ -90,6 +92,8 @@ export function emptyDeskCard(q?: { symbol?: string; interval?: string; venue?: 
     squeezeArmed: null,
     fundingPct: null,
     oiZ: null,
+    lsPosition: null,
+    crowdDisagrees: null,
   }
 }
 
@@ -118,6 +122,8 @@ export function toDeskCard(s: Partial<CoilSnapshot> | Record<string, unknown> | 
     squeezeArmed: boolOrNull(squeeze.armed ?? rec.squeezeArmed),
     fundingPct: numOrNull(squeeze.fundingPct ?? rec.fundingPct),
     oiZ: numOrNull(squeeze.oiZ ?? rec.oiZ),
+    lsPosition: numOrNull(squeeze.lsPosition ?? rec.lsPosition),
+    crowdDisagrees: boolOrNull(squeeze.crowdDisagrees ?? rec.crowdDisagrees),
   }
 }
 
@@ -133,7 +139,7 @@ export function exportEnvelope(query: unknown, snapshot: CoilSnapshot, fetchedAt
       score: "0–100 crowd/squeeze setup strength. Not mixed with Gravity G or ANVIL A. Not P(next candle).",
       bias: "[-1,+1]. Negative = long crowd vulnerable. Positive = short crowd vulnerable.",
       regime: "squeeze_armed only if squeeze.armed. Else squeeze_watch if squeeze.watch or score≥35. Else quiet.",
-      squeeze: "Flags from 30d funding percentile, L/S, OI z. Not an order.",
+      squeeze: "Flags from 30d funding percentile, L/S accounts, OI z. Armed blocked when account L/S disagrees with whale position ratio. Not an order.",
       source: "live = real tape. demo = synthetic. Never a venue id.",
       mmFlow: "Inventory transfers, not proven intent. Weight cap 10%.",
       gravity: "Optional sibling snapshot. Not mixed into COIL score.",

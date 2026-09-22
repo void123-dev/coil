@@ -1,6 +1,7 @@
 import type { Interval, SymbolId, VenuePack } from "../../coil/types.ts"
 import { getJson } from "../http.ts"
 import { alignBars, nearestFill, num, type Candle } from "./align.ts"
+import { fetchBinanceLsPosition } from "./position-ratio.ts"
 
 function bybitInterval(interval: Interval): string {
   if (interval === "1m") return "1"
@@ -41,7 +42,7 @@ export async function fetchBybitPack(
   const iv = bybitInterval(interval)
   const limit = Math.min(200, Math.max(window, 96) + 8)
 
-  const [spot, perp, ticker, funding, oi] = await Promise.all([
+  const [spot, perp, ticker, funding, oi, lsPosition] = await Promise.all([
     getJson(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${pair}&interval=${iv}&limit=${limit}`),
     getJson(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${pair}&interval=${iv}&limit=${limit}`),
     getJson<{ result?: { list?: Array<{ fundingRate?: string; markPrice?: string; openInterest?: string; openInterestValue?: string }> } }>(
@@ -53,6 +54,7 @@ export async function fetchBybitPack(
     getJson<{ result?: { list?: Array<{ openInterest?: string; timestamp?: string }> } }>(
       `https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${pair}&intervalTime=${oiPeriod(interval)}&limit=${Math.min(limit, 200)}`,
     ),
+    fetchBinanceLsPosition(symbol),
   ])
 
   const spotBars = parseBybitKlines(spot)
@@ -98,6 +100,7 @@ export async function fetchBybitPack(
     oiHistory,
     lsAccount: null,
     lsTop: null,
+    lsPosition,
     source: "live",
   }
 }

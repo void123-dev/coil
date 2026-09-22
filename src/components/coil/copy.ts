@@ -17,6 +17,7 @@ export const COPY = {
     percentile: "percentile",
     lsAccount: "L/S account",
     lsTop: "L/S top",
+    lsPosition: "L/S position",
     oi: "Open interest",
     basis: "Basis",
     spotTaker: "Spot flow",
@@ -52,6 +53,7 @@ export const COPY = {
     covering: "covering",
     notCovering: "not covering",
     oiRising: "OI rising",
+    crowdDisagrees: "accounts ≠ notional",
   },
   ru: {
     tagline: "Толпа и сквиз. Не прогноз следующей свечи.",
@@ -67,6 +69,7 @@ export const COPY = {
     percentile: "перцентиль",
     lsAccount: "L/S счета",
     lsTop: "L/S топ",
+    lsPosition: "L/S позиции",
     oi: "Открытый интерес",
     basis: "Базис",
     spotTaker: "Спот поток",
@@ -102,6 +105,7 @@ export const COPY = {
     covering: "закрытие",
     notCovering: "без закрытия",
     oiRising: "OI растёт",
+    crowdDisagrees: "счета ≠ ноционал",
   },
 } as const
 

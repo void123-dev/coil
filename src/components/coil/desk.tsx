@@ -110,7 +110,12 @@ function SqueezeStrip({ snap, lang }: { snap: CoilSnapshot; lang: Lang }) {
   const flag = snap.squeeze.armed ? "armed" : snap.squeeze.watch ? "watch" : "none"
   const lsAcc = snap.squeeze.lsAccount
   const lsTop = snap.squeeze.lsTop
-  const ls = [lsAcc === null ? null : `${lsAcc.toFixed(2)} acc`, lsTop === null ? null : `${lsTop.toFixed(2)} top`]
+  const lsPos = snap.squeeze.lsPosition ?? snap.lsPosition
+  const ls = [
+    lsAcc === null ? null : `${lsAcc.toFixed(2)} acc`,
+    lsTop === null ? null : `${lsTop.toFixed(2)} top`,
+    lsPos === null ? null : `${lsPos.toFixed(2)} pos`,
+  ]
     .filter(Boolean)
     .join("  ·  ")
   return (
@@ -362,6 +367,9 @@ function Hero({
           <div className="flex flex-wrap gap-2">
             <Pill tone={regimeTone}>{REGIME_LABEL[lang][snap.regime]}</Pill>
             <Pill tone={crowdTone}>{CROWD_LABEL[lang][snap.crowdSide]}</Pill>
+            {snap.squeeze.crowdDisagrees ? (
+              <Pill tone="watch">{copy.crowdDisagrees}</Pill>
+            ) : null}
             <Pill tone={snap.thinTape ? "watch" : "quiet"}>
               {copy.thin}: {snap.thinTape ? copy.yes : copy.no}
             </Pill>
@@ -403,6 +411,11 @@ function Metrics({ snap, lang }: { snap: CoilSnapshot; lang: Lang }) {
       <Metric label={copy.funding} value={fmtFunding(snap.funding)} hint={snap.fundingPercentile === null ? undefined : `${copy.percentile} ${fmtPct(snap.fundingPercentile, 0)}`} />
       <Metric label={copy.lsAccount} value={snap.lsAccount === null ? "—" : snap.lsAccount.toFixed(2)} />
       <Metric label={copy.lsTop} value={snap.lsTop === null ? "—" : snap.lsTop.toFixed(2)} />
+      <Metric
+        label={copy.lsPosition}
+        value={snap.lsPosition === null ? "—" : snap.lsPosition.toFixed(2)}
+        hint={snap.squeeze.crowdDisagrees ? copy.crowdDisagrees : undefined}
+      />
       <Metric label={copy.oi} value={fmtUsd(snap.oiUsd)} hint={fmtZ(snap.squeeze.oiZ ?? snap.oiZ)} />
       <Metric
         label={copy.squeeze}

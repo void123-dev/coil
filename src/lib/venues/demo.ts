@@ -89,6 +89,7 @@ export function makeDemoPack(
     oiHistory,
     lsAccount: lsTilt,
     lsTop: Math.max(0.35, lsTilt * (0.85 + ((seed >>> 11) % 40) / 100)),
+    lsPosition: null,
     source: "demo",
     oiHistory30d: [],
     historyDays: 0,

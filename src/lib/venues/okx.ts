@@ -2,6 +2,7 @@ import type { Interval, SymbolId, VenuePack } from "../../coil/types.ts"
 import { cached, seriesCacheTtlMs } from "../cache.ts"
 import { getJson } from "../http.ts"
 import { alignBars, nearestFill, num, overlayTakerPct, type Candle } from "./align.ts"
+import { fetchBinanceLsPosition } from "./position-ratio.ts"
 
 function parseOkxCandles(data: unknown): Candle[] {
   const list = (data as { data?: string[][] } | null)?.data
@@ -132,13 +133,14 @@ export async function fetchOkxPack(
   if (currentFunding !== null) fundingHistory.push(currentFunding)
 
   const period = rubikPeriod(interval)
-  const [oiHist, lsAcc, lsTop, takerPerp, takerSpot, lookback] = await Promise.all([
+  const [oiHist, lsAcc, lsTop, takerPerp, takerSpot, lookback, lsPosition] = await Promise.all([
     getJson(`https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-history?instId=${swapId}&period=${period}&limit=100`),
     getJson(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${swapId}&period=${period}`),
     getJson(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${swapId}&period=${period}`),
     getJson(`https://www.okx.com/api/v5/rubik/stat/taker-volume-contract?instId=${swapId}&period=${period}`),
     getJson(`https://www.okx.com/api/v5/rubik/stat/taker-volume?ccy=${symbol}&instType=SPOT&period=${period}`),
     fetchOkxLookback(swapId),
+    fetchBinanceLsPosition(symbol),
   ])
 
   const mark = num(ticker?.data?.[0]?.markPx) ?? perpBars[perpBars.length - 1]?.close ?? 0
@@ -180,6 +182,7 @@ export async function fetchOkxPack(
     oiHistory,
     lsAccount: lsAccLatest,
     lsTop: lsTopLatest,
+    lsPosition,
     source: "live",
     oiHistory30d: lookback.oiHistory30d,
     historyDays,

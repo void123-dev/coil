@@ -1,6 +1,7 @@
 import type { Interval, SymbolId, VenuePack } from "../../coil/types.ts"
 import { getJson } from "../http.ts"
 import { alignBars, nearestFill, num, type Candle } from "./align.ts"
+import { fetchBinanceLsPosition } from "./position-ratio.ts"
 
 function binanceInterval(interval: Interval): string {
   if (interval === "1H") return "1h"
@@ -37,7 +38,7 @@ export async function fetchBinancePack(
   const limit = klineLimit(window)
   const period = iv
 
-  const [spot, perp, premium, fundingHist, oiNow, oiHist, lsAcc, lsTop] = await Promise.all([
+  const [spot, perp, premium, fundingHist, oiNow, oiHist, lsAcc, lsTop, lsPosition] = await Promise.all([
     getJson<unknown[]>(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${iv}&limit=${limit}`),
     getJson<unknown[]>(`https://fapi.binance.com/fapi/v1/klines?symbol=${pair}&interval=${iv}&limit=${limit}`),
     getJson<{ lastFundingRate?: string; markPrice?: string }>(
@@ -54,8 +55,9 @@ export async function fetchBinancePack(
       `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${pair}&period=${period}&limit=1`,
     ),
     getJson<Array<{ longShortRatio?: string }>>(
-      `https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=${pair}&period=${period}&limit=1`,
+      `https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=${pair}&period=${period}&limit=1`,
     ),
+    fetchBinanceLsPosition(symbol),
   ])
 
   const spotBars = parseKlines(spot)
@@ -115,6 +117,7 @@ export async function fetchBinancePack(
     oiHistory,
     lsAccount: num(lsAcc?.[0]?.longShortRatio),
     lsTop: num(lsTop?.[0]?.longShortRatio),
+    lsPosition,
     source: "live",
   }
 }

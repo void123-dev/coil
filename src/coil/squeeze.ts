@@ -1,6 +1,8 @@
 import type { CrowdSide, Regime, Source, SqueezeRead } from "./types.ts"
 
 const MIN_HISTORY_DAYS = 10
+const POSITION_LONG = 1.5
+const POSITION_SHORT = 0.8
 
 export function shortsCrowded(
   fundingPct: number | null,
@@ -21,6 +23,21 @@ export function longsCrowded(
   if (fundingPct === null || fundingPct < 0.8) return false
   if (lsAccount === null && lsTop === null) return false
   return (lsAccount !== null && lsAccount >= 1.6) || (lsTop !== null && lsTop >= 2.2)
+}
+
+export function crowdDisagrees(
+  lsAccount: number | null,
+  lsTop: number | null,
+  lsPosition: number | null,
+): boolean {
+  if (lsPosition === null) return false
+  const accountShort =
+    (lsAccount !== null && lsAccount <= 1.05) || (lsTop !== null && lsTop <= 0.95)
+  const accountLong =
+    (lsAccount !== null && lsAccount >= 1.6) || (lsTop !== null && lsTop >= 2.2)
+  if (accountShort && lsPosition >= POSITION_LONG) return true
+  if (accountLong && lsPosition <= POSITION_SHORT) return true
+  return false
 }
 
 export function fuelOn(oiZ: number | null): boolean {
@@ -45,6 +62,7 @@ export type SqueezeInput = {
   fundingPct: number | null
   lsAccount: number | null
   lsTop: number | null
+  lsPosition: number | null
   oiZ: number | null
   oiRising: boolean | null
   spotLeadsAgainstCrowd: boolean
@@ -62,6 +80,8 @@ export function emptySqueeze(partial: Partial<SqueezeRead> = {}): SqueezeRead {
     fundingPct: null,
     lsAccount: null,
     lsTop: null,
+    lsPosition: null,
+    crowdDisagrees: false,
     oiZ: null,
     oiRising: null,
     covering: false,
@@ -76,6 +96,7 @@ export function detectSqueeze(input: SqueezeInput): SqueezeRead {
     fundingPct: historyOk ? input.fundingPct : null,
     lsAccount: input.lsAccount,
     lsTop: input.lsTop,
+    lsPosition: input.lsPosition,
     oiZ: historyOk ? input.oiZ : null,
     oiRising: historyOk ? input.oiRising : null,
     covering: coveringOf(input.pxNow, input.pxThen, input.oiNow, input.oiThen),
@@ -86,24 +107,27 @@ export function detectSqueeze(input: SqueezeInput): SqueezeRead {
 
   const shortCrowd = shortsCrowded(fields.fundingPct, fields.lsAccount, fields.lsTop)
   const longCrowd = longsCrowded(fields.fundingPct, fields.lsAccount, fields.lsTop)
+  const disagree = crowdDisagrees(fields.lsAccount, fields.lsTop, fields.lsPosition)
   const on = fuelOn(fields.oiZ)
   const hot = fuelHot(fields.oiZ, fields.oiRising)
   const lead = input.spotLeadsAgainstCrowd
 
   const shortWatch = shortCrowd && on
-  const shortArmed = shortCrowd && hot && lead
+  const shortArmed = shortCrowd && hot && lead && !disagree
   const longWatch = longCrowd && on
-  const longArmed = longCrowd && hot && lead
+  const longArmed = longCrowd && hot && lead && !disagree
 
-  if ((shortWatch || shortArmed) && (longWatch || longArmed)) return fields
+  if ((shortWatch || shortArmed) && (longWatch || longArmed)) {
+    return { ...fields, crowdDisagrees: disagree }
+  }
 
   if (shortArmed || shortWatch) {
-    return { ...fields, side: "short", watch: shortWatch || shortArmed, armed: shortArmed }
+    return { ...fields, side: "short", watch: shortWatch || shortArmed, armed: shortArmed, crowdDisagrees: disagree }
   }
   if (longArmed || longWatch) {
-    return { ...fields, side: "long", watch: longWatch || longArmed, armed: longArmed }
+    return { ...fields, side: "long", watch: longWatch || longArmed, armed: longArmed, crowdDisagrees: disagree }
   }
-  return fields
+  return { ...fields, crowdDisagrees: disagree }
 }
 
 export function regimeOf(score: number, squeeze: SqueezeRead): Regime {
@@ -128,6 +152,18 @@ export function squeezeHeadline(
     return {
       en: "Armed long squeeze · spot leads vs crowded longs",
       ru: "Заряд лонг-сквиза · спот ведёт против толпы в лонге",
+    }
+  }
+  if (squeeze.watch && squeeze.side === "short" && squeeze.crowdDisagrees) {
+    return {
+      en: "Watch short squeeze · accounts short, whale book long",
+      ru: "Наблюдение шорт-сквиза · счета в шорте, китовый ноционал в лонге",
+    }
+  }
+  if (squeeze.watch && squeeze.side === "long" && squeeze.crowdDisagrees) {
+    return {
+      en: "Watch long squeeze · accounts long, whale book short",
+      ru: "Наблюдение лонг-сквиза · счета в лонге, китовый ноционал в шорте",
     }
   }
   if (squeeze.watch && squeeze.side === "short") {

@@ -23,6 +23,7 @@ const CSV_COLS = [
   "oiZ",
   "lsAccount",
   "lsTop",
+  "lsPosition",
   "spotTakerBuyPct",
   "perpTakerBuyPct",
   "spotLeadsAgainstCrowd",

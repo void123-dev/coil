@@ -45,7 +45,7 @@ GET $COIL_API_BASE/api/venues
 
 Card fields (root, and again under `snapshot` / `card` on `/api/export`):
 
-`score` `regime` `crowdSide` `bias` `spotLeadsAgainstCrowd` `thinTape` `session` `source` `venue` `symbol` `interval` `squeezeSide` `squeezeWatch` `squeezeArmed` `fundingPct` `oiZ`
+`score` `regime` `crowdSide` `bias` `spotLeadsAgainstCrowd` `thinTape` `session` `source` `venue` `symbol` `interval` `squeezeSide` `squeezeWatch` `squeezeArmed` `fundingPct` `oiZ` `lsPosition` `crowdDisagrees`
 
 `regime`: `quiet` | `squeeze_watch` | `squeeze_armed`  
 `crowdSide`: `short` | `long` | `mixed`  
@@ -75,10 +75,14 @@ fuelOn  = oiZ >= 1.0
 fuelHot = oiZ >= 1.5 OR (oiZ >= 1.2 AND oiRising)
 
 shortSqueezeWatch = shortsCrowded AND fuelOn
-shortSqueezeArmed = shortsCrowded AND fuelHot AND spotLeadsAgainstCrowd === true
+shortSqueezeArmed = shortsCrowded AND fuelHot AND spotLeadsAgainstCrowd === true AND crowdDisagrees === false
 longSqueezeWatch  = longsCrowded AND fuelOn
-longSqueezeArmed  = longsCrowded AND fuelHot AND spotLeadsAgainstCrowd === true
+longSqueezeArmed  = longsCrowded AND fuelHot AND spotLeadsAgainstCrowd === true AND crowdDisagrees === false
 ```
+
+`crowdDisagrees` = account L/S is short (`lsAccount ≤ 1.05` or `lsTop ≤ 0.95`) while Binance **top-trader position** ratio `lsPosition ≥ 1.50`, or the inverse (accounts long, whale book `≤ 0.80`). Watch still fires. Armed does not. Score weights do not change.
+
+`lsPosition` is Binance whale notional, overlaid on every pit (OKX/Bybit do not publish position-weighted L/S). Missing `lsPosition` does **not** block armed.
 
 If both sides would trigger → `side="none"`, watch/armed false.
 

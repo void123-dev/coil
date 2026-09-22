@@ -22,6 +22,8 @@ export type SqueezeRead = {
   fundingPct: number | null
   lsAccount: number | null
   lsTop: number | null
+  lsPosition: number | null
+  crowdDisagrees: boolean
   oiZ: number | null
   oiRising: boolean | null
   covering: boolean
@@ -50,6 +52,7 @@ export type VenuePack = {
   oiHistory: number[]
   lsAccount: number | null // longs/shorts, 1 = balanced, >1 more longs
   lsTop: number | null
+  lsPosition?: number | null // Binance top-trader position ratio (whale notional)
   source: "live" | "demo"
   oiHistory30d?: number[]
   historyDays?: number | null
@@ -110,6 +113,7 @@ export type CoilSnapshot = {
   oiZ: number | null
   lsAccount: number | null
   lsTop: number | null
+  lsPosition: number | null
   spotTakerBuyPct: number | null
   perpTakerBuyPct: number | null
   spotVol: number
@@ -147,4 +151,6 @@ export type DeskCard = {
   squeezeArmed: boolean | null
   fundingPct: number | null
   oiZ: number | null
+  lsPosition: number | null
+  crowdDisagrees: boolean | null
 }
