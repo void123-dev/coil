@@ -14,6 +14,30 @@ export type CrowdSide = "short" | "long" | "mixed"
 export type Regime = "quiet" | "squeeze_watch" | "squeeze_armed"
 export type Source = "demo" | "live"
 export type SqueezeSide = "short" | "long" | "none"
+export type LiqMagnet = "short_above" | "long_below" | "both" | "none"
+export type LiqReason = "no_key" | "unavailable"
+
+export type LiqBin = { price: number; usd: number }
+
+export type LiqFeed = {
+  status: "ok" | "no_key" | "unavailable"
+  bins: LiqBin[]
+}
+
+export type LiqRead = {
+  available: boolean
+  source: "coinglass" | "none"
+  range: "24h"
+  price: number
+  shortAboveUsd: number | null
+  longBelowUsd: number | null
+  nearestShortPct: number | null
+  nearestLongPct: number | null
+  magnet: LiqMagnet
+  magnetUsd: number | null
+  againstCrowd: boolean
+  reason: LiqReason | null
+}
 
 export type SqueezeRead = {
   side: SqueezeSide
@@ -123,6 +147,7 @@ export type CoilSnapshot = {
   spotLeadsAgainstCrowd: boolean
   thinTape: boolean
   squeeze: SqueezeRead
+  liq: LiqRead
   mmFlow: { status: "disabled" | "demo" | "live" | "empty"; events: MmEvent[] }
   gravity: GravityHint
   series: Array<{
@@ -153,4 +178,7 @@ export type DeskCard = {
   oiZ: number | null
   lsPosition: number | null
   crowdDisagrees: boolean | null
+  liqAvailable: boolean | null
+  liqMagnet: LiqMagnet | null
+  liqAgainstCrowd: boolean | null
 }

@@ -5,6 +5,7 @@ import {
   SYMBOLS,
   type CoilSnapshot,
   type Interval,
+  type LiqFeed,
   type Source,
   type SymbolId,
   type Venue,
@@ -13,6 +14,7 @@ import {
 import { cached } from "./cache.ts"
 import { fetchGravityHint } from "./gravity-client.ts"
 import { fetchMmFlow } from "./mm-flow.ts"
+import { fetchLiqFeed } from "./venues/coinglass-liq.ts"
 import { fetchAllPits, fetchVenuePack, PIT_IDS, venuesPayload, type LivePit, type VenuesPayload } from "./venues/index.ts"
 
 export type ParsedQuery = ReturnType<typeof parseQuery> & { venue: Venue }
@@ -99,6 +101,7 @@ async function snapshotForPit(
   gravity: CoilSnapshot["gravity"],
   mmEvents: CoilSnapshot["mmFlow"]["events"],
   mmStatus: CoilSnapshot["mmFlow"]["status"],
+  liqFeed: LiqFeed,
 ): Promise<CoilSnapshot> {
   const pack = await fetchVenuePack(pit, symbol, interval, window)
   const snap = computeCoil({
@@ -109,6 +112,7 @@ async function snapshotForPit(
     pack,
     gravity,
     mmEvents: mmStatus === "disabled" ? [] : mmEvents,
+    liqFeed,
   })
   snap.mmFlow = { status: mmStatus, events: mmStatus === "disabled" ? [] : mmEvents }
   return snap
@@ -126,9 +130,10 @@ async function buildSnapshot(query: ParsedQuery): Promise<CoilSnapshot> {
   const window = query.window
   const venue = await resolveVenue(query)
 
-  const [gravity, mm] = await Promise.all([
+  const [gravity, mm, liqFeed] = await Promise.all([
     fetchGravityHint(symbol, interval, window),
     fetchMmFlow(),
+    fetchLiqFeed(symbol),
   ])
   const mmEvents = mm.status === "disabled" ? [] : mm.events
 
@@ -136,7 +141,7 @@ async function buildSnapshot(query: ParsedQuery): Promise<CoilSnapshot> {
     const packs = await fetchAllPits(symbol, interval, window)
     const pitSnaps = await Promise.all(
       PIT_IDS.map((pit) =>
-        snapshotForPit(pit, symbol, interval, window, pit, gravity, mmEvents, mm.status),
+        snapshotForPit(pit, symbol, interval, window, pit, gravity, mmEvents, mm.status, liqFeed),
       ),
     )
     const pits: NonNullable<CoilSnapshot["pits"]> = {}
@@ -162,7 +167,7 @@ async function buildSnapshot(query: ParsedQuery): Promise<CoilSnapshot> {
     return used
   }
 
-  return snapshotForPit(venue, symbol, interval, window, venue, gravity, mmEvents, mm.status)
+  return snapshotForPit(venue, symbol, interval, window, venue, gravity, mmEvents, mm.status, liqFeed)
 }
 
 export async function getCoilSnapshot(query: ParsedQuery): Promise<CoilSnapshot> {

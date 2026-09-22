@@ -54,6 +54,13 @@ export const COPY = {
     notCovering: "not covering",
     oiRising: "OI rising",
     crowdDisagrees: "accounts ≠ notional",
+    liq: "liq magnet",
+    liqNone: "none",
+    liqNoKey: "liq: no CoinGlass key",
+    liqUnavailable: "liq: unavailable",
+    liqShortAbove: "shorts above",
+    liqLongBelow: "longs below",
+    liqBoth: "both",
   },
   ru: {
     tagline: "Толпа и сквиз. Не прогноз следующей свечи.",
@@ -106,6 +113,13 @@ export const COPY = {
     notCovering: "без закрытия",
     oiRising: "OI растёт",
     crowdDisagrees: "счета ≠ ноционал",
+    liq: "магнит ликвидаций",
+    liqNone: "нет",
+    liqNoKey: "liq: нет ключа CoinGlass",
+    liqUnavailable: "liq: нет данных",
+    liqShortAbove: "шорты выше",
+    liqLongBelow: "лонги ниже",
+    liqBoth: "оба",
   },
 } as const
 

@@ -1,5 +1,6 @@
-import { WEIGHTS, type CoilSnapshot, type CrowdSide, type GravityHint, type MmEvent, type Regime, type Source, type VenuePack } from "./types.ts"
+import { WEIGHTS, type CoilSnapshot, type CrowdSide, type GravityHint, type LiqFeed, type MmEvent, type Regime, type Source, type VenuePack } from "./types.ts"
 import { detectSqueeze, regimeOf, squeezeHeadline } from "./squeeze.ts"
+import { liqHeadlineSuffix, readLiq } from "./liq.ts"
 import { basisBps, clamp, mean, percentileRank, takerBuyPct, zScore } from "./math.ts"
 import { sessionAt } from "./session.ts"
 
@@ -53,6 +54,7 @@ export function computeCoil(opts: {
   pack: VenuePack
   gravity?: GravityHint | null
   mmEvents?: MmEvent[]
+  liqFeed?: LiqFeed | null
   now?: number
 }): CoilSnapshot {
   const now = opts.now ?? Date.now()
@@ -117,13 +119,17 @@ export function computeCoil(opts: {
   const conf = clamp(
     (Number(fundingPct !== null) + Number(opts.pack.lsAccount !== null) + Number(oiZ !== null) + Number(spotFlow !== null)) / 4,
   )
+  const liq = source === "live"
+    ? readLiq(opts.liqFeed, last?.spot ?? 0, squeeze.side)
+    : readLiq({ status: "no_key", bins: [] }, last?.spot ?? 0, squeeze.side)
   const { en, ru } = squeezeHeadline(squeeze, side, spotLeadsAgainstCrowd)
+  const extra = liqHeadlineSuffix(liq, squeeze.side)
 
   return {
     model: "COIL-1.1",
     symbol: opts.symbol, interval: opts.interval, window: opts.window, venue: opts.venue,
     source, asOf: last?.t ?? now, session, score, bias, regime, crowdSide: side,
-    confidence: conf, headline: en, headlineRu: ru, components, weights: WEIGHTS,
+    confidence: conf, headline: extra ? `${en}${extra.en}` : en, headlineRu: extra ? `${ru}${extra.ru}` : ru, components, weights: WEIGHTS,
     spot: last?.spot ?? 0, perp: last?.perp ?? 0,
     basisBps: last ? basisBps(last.spot, last.perp) : 0,
     funding: opts.pack.funding, fundingPercentile: fundingPct,
@@ -135,6 +141,7 @@ export function computeCoil(opts: {
     perpVolRel: avgPerp ? (last?.perpVol ?? 0) / avgPerp : 1,
     spotLeadsAgainstCrowd, thinTape: session.thin,
     squeeze,
+    liq,
     mmFlow: { status: mmStatus === "disabled" ? "disabled" : events.length ? mmStatus : "empty", events },
     gravity: opts.gravity ?? { available: false },
     series: bars.map((b) => ({

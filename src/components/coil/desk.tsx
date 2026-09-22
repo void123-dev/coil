@@ -332,6 +332,22 @@ export function CoilDesk({
   )
 }
 
+function liqChip(snap: CoilSnapshot, copy: (typeof COPY)[Lang]): string {
+  if (!snap.liq.available) {
+    return snap.liq.reason === "unavailable" ? copy.liqUnavailable : copy.liqNoKey
+  }
+  if (snap.liq.magnet === "short_above") {
+    const pct = snap.liq.nearestShortPct
+    return `${copy.liq}: ${copy.liqShortAbove}${pct === null ? "" : ` ${pct.toFixed(1)}%`}`
+  }
+  if (snap.liq.magnet === "long_below") {
+    const pct = snap.liq.nearestLongPct
+    return `${copy.liq}: ${copy.liqLongBelow}${pct === null ? "" : ` ${Math.abs(pct).toFixed(1)}%`}`
+  }
+  if (snap.liq.magnet === "both") return `${copy.liq}: ${copy.liqBoth}`
+  return `${copy.liq}: ${copy.liqNone}`
+}
+
 function ChipRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -370,6 +386,9 @@ function Hero({
             {snap.squeeze.crowdDisagrees ? (
               <Pill tone="watch">{copy.crowdDisagrees}</Pill>
             ) : null}
+            <Pill tone={snap.liq.available && snap.liq.magnet !== "none" ? "watch" : "quiet"}>
+              {liqChip(snap, copy)}
+            </Pill>
             <Pill tone={snap.thinTape ? "watch" : "quiet"}>
               {copy.thin}: {snap.thinTape ? copy.yes : copy.no}
             </Pill>
@@ -415,6 +434,17 @@ function Metrics({ snap, lang }: { snap: CoilSnapshot; lang: Lang }) {
         label={copy.lsPosition}
         value={snap.lsPosition === null ? "—" : snap.lsPosition.toFixed(2)}
         hint={snap.squeeze.crowdDisagrees ? copy.crowdDisagrees : undefined}
+      />
+      <Metric
+        label={copy.liq}
+        value={
+          !snap.liq.available ? (snap.liq.reason === "unavailable" ? copy.liqUnavailable : copy.liqNoKey)
+          : snap.liq.magnet === "short_above" ? copy.liqShortAbove
+          : snap.liq.magnet === "long_below" ? copy.liqLongBelow
+          : snap.liq.magnet === "both" ? copy.liqBoth
+          : copy.liqNone
+        }
+        hint={snap.liq.magnetUsd ? fmtUsd(snap.liq.magnetUsd) : undefined}
       />
       <Metric label={copy.oi} value={fmtUsd(snap.oiUsd)} hint={fmtZ(snap.squeeze.oiZ ?? snap.oiZ)} />
       <Metric

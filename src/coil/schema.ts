@@ -8,6 +8,7 @@ import {
   type CoilSnapshot,
   type CrowdSide,
   type DeskCard,
+  type LiqMagnet,
   type Regime,
   type Source,
   type SqueezeSide,
@@ -26,6 +27,7 @@ const REGIMES: readonly Regime[] = ["quiet", "squeeze_watch", "squeeze_armed"]
 const CROWDS: readonly CrowdSide[] = ["short", "long", "mixed"]
 const SOURCES: readonly Source[] = ["demo", "live"]
 const SQUEEZE_SIDES: readonly SqueezeSide[] = ["short", "long", "none"]
+const LIQ_MAGNETS: readonly LiqMagnet[] = ["short_above", "long_below", "both", "none"]
 
 export const DeskCardSchema = z.object({
   score: z.number().nullable(),
@@ -46,6 +48,9 @@ export const DeskCardSchema = z.object({
   oiZ: z.number().nullable(),
   lsPosition: z.number().nullable(),
   crowdDisagrees: z.boolean().nullable(),
+  liqAvailable: z.boolean().nullable(),
+  liqMagnet: z.enum(["short_above", "long_below", "both", "none"]).nullable(),
+  liqAgainstCrowd: z.boolean().nullable(),
 })
 
 export function parseQuery(url: URL) {
@@ -94,6 +99,9 @@ export function emptyDeskCard(q?: { symbol?: string; interval?: string; venue?: 
     oiZ: null,
     lsPosition: null,
     crowdDisagrees: null,
+    liqAvailable: null,
+    liqMagnet: null,
+    liqAgainstCrowd: null,
   }
 }
 
@@ -104,6 +112,7 @@ export function toDeskCard(s: Partial<CoilSnapshot> | Record<string, unknown> | 
   const regimeRaw = rec.regime
   const crowdRaw = rec.crowdSide
   const squeeze = rec.squeeze && typeof rec.squeeze === "object" ? rec.squeeze as Record<string, unknown> : rec
+  const liq = rec.liq && typeof rec.liq === "object" ? rec.liq as Record<string, unknown> : rec
   const squeezeSideRaw = squeeze.side ?? rec.squeezeSide
   return {
     score: numOrNull(rec.score),
@@ -124,6 +133,9 @@ export function toDeskCard(s: Partial<CoilSnapshot> | Record<string, unknown> | 
     oiZ: numOrNull(squeeze.oiZ ?? rec.oiZ),
     lsPosition: numOrNull(squeeze.lsPosition ?? rec.lsPosition),
     crowdDisagrees: boolOrNull(squeeze.crowdDisagrees ?? rec.crowdDisagrees),
+    liqAvailable: boolOrNull(liq.available ?? rec.liqAvailable),
+    liqMagnet: LIQ_MAGNETS.includes((liq.magnet ?? rec.liqMagnet) as LiqMagnet) ? ((liq.magnet ?? rec.liqMagnet) as LiqMagnet) : null,
+    liqAgainstCrowd: boolOrNull(liq.againstCrowd ?? rec.liqAgainstCrowd),
   }
 }
 
@@ -140,6 +152,7 @@ export function exportEnvelope(query: unknown, snapshot: CoilSnapshot, fetchedAt
       bias: "[-1,+1]. Negative = long crowd vulnerable. Positive = short crowd vulnerable.",
       regime: "squeeze_armed only if squeeze.armed. Else squeeze_watch if squeeze.watch or score≥35. Else quiet.",
       squeeze: "Flags from 30d funding percentile, L/S accounts, OI z. Armed blocked when account L/S disagrees with whale position ratio. Not an order.",
+      liq: "Optional CoinGlass liquidation-map overlay. Annotates squeeze. Never sets armed. Fail-soft without COINGLASS_API_KEY.",
       source: "live = real tape. demo = synthetic. Never a venue id.",
       mmFlow: "Inventory transfers, not proven intent. Weight cap 10%.",
       gravity: "Optional sibling snapshot. Not mixed into COIL score.",

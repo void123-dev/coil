@@ -62,7 +62,7 @@ GET $COIL_API_BASE/api/venues
 
 Card fields (root **or** under `snapshot` / `card`):
 
-`score` · `regime` · `crowdSide` · `bias` · `spotLeadsAgainstCrowd` · `thinTape` · `session` · `source` · `venue` · `symbol` · `interval` · `squeezeSide` · `squeezeWatch` · `squeezeArmed` · `fundingPct` · `oiZ` · `lsPosition` · `crowdDisagrees`
+`score` · `regime` · `crowdSide` · `bias` · `spotLeadsAgainstCrowd` · `thinTape` · `session` · `source` · `venue` · `symbol` · `interval` · `squeezeSide` · `squeezeWatch` · `squeezeArmed` · `fundingPct` · `oiZ` · `lsPosition` · `crowdDisagrees` · `liqAvailable` · `liqMagnet` · `liqAgainstCrowd`
 
 Missing fields render as `null`, never as an HTML error page.
 
@@ -91,8 +91,9 @@ Optional env:
 | `COIL_DEFAULT_VENUE` | Live-pit override (`okx` / `bybit` / `binance` / `all`) |
 | `MM_FLOW_SOURCE` | `off` (default) / `demo` / `url` |
 | `MM_FLOW_URL` | JSON inventory events when source is `url` |
+| `COINGLASS_API_KEY` | Optional. Official CoinGlass v4 key for the liquidation-map overlay. Unset → `liq.available=false`. Never mixed into score. Professional+ plan. |
 
-No API keys. Do not scrape Arkham.
+Do not scrape CoinGlass HTML. Do not scrape Arkham.
 
 ---
 

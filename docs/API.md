@@ -45,7 +45,7 @@ GET $COIL_API_BASE/api/venues
 
 Card fields (root, and again under `snapshot` / `card` on `/api/export`):
 
-`score` `regime` `crowdSide` `bias` `spotLeadsAgainstCrowd` `thinTape` `session` `source` `venue` `symbol` `interval` `squeezeSide` `squeezeWatch` `squeezeArmed` `fundingPct` `oiZ` `lsPosition` `crowdDisagrees`
+`score` `regime` `crowdSide` `bias` `spotLeadsAgainstCrowd` `thinTape` `session` `source` `venue` `symbol` `interval` `squeezeSide` `squeezeWatch` `squeezeArmed` `fundingPct` `oiZ` `lsPosition` `crowdDisagrees` `liqAvailable` `liqMagnet` `liqAgainstCrowd`
 
 `regime`: `quiet` | `squeeze_watch` | `squeeze_armed`  
 `crowdSide`: `short` | `long` | `mixed`  
@@ -92,6 +92,28 @@ If both sides would trigger → `side="none"`, watch/armed false.
 
 Extra diagnostic (not a flag): `squeeze.covering` = price up while OI lags (spent cover, not a live arm). `squeeze.historyDays` is the lookback span.
 
+## Liquidation magnet (overlay)
+
+Optional. **Not inside `score`.** Official CoinGlass `GET /api/futures/liquidation/map` with header `CG-API-KEY`. Range `1d` (shown as `24h`). Plan: Professional+. No HTML scrape.
+
+If `COINGLASS_API_KEY` is unset → `liq.available=false`, `reason="no_key"`, squeeze flags unchanged.
+
+`liq.magnet`:
+
+- `short_above` — short-liq notional in (price, +1.5%] is large and ≥ 2× the downside pocket
+- `long_below` — long-liq notional in [−1.5%, price) is large and ≥ 2× the upside pocket
+- `both` / `none`
+
+Large = pocket ≥ 60th percentile of that side’s 24h bins. Direction: bins above price are shorts, below are longs.
+
+Annotates only:
+
+- `squeeze.side==short` and magnet `short_above` → headline “liq magnet above”
+- `squeeze.side==long` and magnet `long_below` → “liq magnet below”
+- opposite magnet → `liq.againstCrowd=true`, **does not arm**
+
+Never flip `squeeze.armed` from a magnet. Snapshot includes the full `liq` object.
+
 ## `GET /api/venues`
 
 ```json
@@ -135,8 +157,9 @@ Envelope: `api: "coil-export"`, `version: "1.1"`, `model: "COIL-1.1"`.
 | `COIL_DEFAULT_VENUE` | optional live-pit override (`okx` \| `bybit` \| `binance` \| `all`) |
 | `MM_FLOW_SOURCE` | `off` (default) \| `demo` \| `url` |
 | `MM_FLOW_URL` | JSON list of inventory events when source is `url` |
+| `COINGLASS_API_KEY` | optional official CoinGlass v4 key; liquidation map overlay only |
 
-No API keys. Do not scrape Arkham.
+No HTML scraping. Do not scrape Arkham.
 
 ## `venue=all`
 

@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { computeCoil } from "./computeCoil.ts"
 import { crowdDisagrees, detectSqueeze } from "./squeeze.ts"
+import { magnetFromBins, readLiq } from "./liq.ts"
+import { parseLiqMap } from "../lib/venues/coinglass-liq.ts"
 import { emptyDeskCard, parseQuery, toDeskCard } from "./schema.ts"
 import { sessionAt, sessionTag } from "./session.ts"
 import { WEIGHTS, type Bar, type VenuePack } from "./types.ts"
@@ -177,6 +179,9 @@ describe("computeCoil", () => {
     assert.equal(snap.regime, "squeeze_armed")
     assert.equal(snap.spotLeadsAgainstCrowd, true)
     assert.equal(snap.squeeze.crowdDisagrees, false)
+    assert.equal(snap.liq.available, false)
+    assert.equal(snap.liq.reason, "no_key")
+    assert.equal(snap.liq.magnet, "none")
   })
 
   it("whale position long vs short accounts keeps watch and blocks armed", () => {
@@ -343,6 +348,109 @@ describe("crowdDisagrees", () => {
   })
 })
 
+describe("liq magnet", () => {
+  const armedPack = () => {
+    const fundingHistory = Array.from({ length: 50 }, (_, i) => -0.001 + i * 0.0001)
+    const oiHistory30d = Array.from({ length: 30 }, () => 1_000_000_000)
+    oiHistory30d[29] = 1_200_000_000
+    return pack({
+      bars: bars({ spot: 100, perp: 100.2 }),
+      funding: -0.0005,
+      fundingHistory,
+      lsAccount: 0.9,
+      lsTop: 0.8,
+      oiUsd: 1_200_000_000,
+      oiHistory30d,
+      historyDays: 30,
+      oiRising: true,
+    })
+  }
+
+  it("no feed → available false, squeeze flags unchanged", () => {
+    const snap = computeCoil({ symbol: "BTC", interval: "5m", window: 48, venue: "okx", pack: armedPack() })
+    assert.equal(snap.liq.available, false)
+    assert.equal(snap.liq.reason, "no_key")
+    assert.equal(snap.squeeze.armed, true)
+    assert.equal(snap.weights.crowd, 0.3)
+  })
+
+  it("short cluster 0.8% above, 3× downside → magnet short_above, armed unchanged", () => {
+    const snap = computeCoil({
+      symbol: "BTC",
+      interval: "5m",
+      window: 48,
+      venue: "okx",
+      pack: armedPack(),
+      liqFeed: {
+        status: "ok",
+        bins: [
+          { price: 100.8, usd: 3_000_000 },
+          { price: 99.2, usd: 1_000_000 },
+        ],
+      },
+    })
+    assert.equal(snap.liq.available, true)
+    assert.equal(snap.liq.magnet, "short_above")
+    assert.equal(snap.squeeze.armed, true)
+    assert.equal(snap.liq.againstCrowd, false)
+    assert.match(snap.headline, /liq magnet above/i)
+  })
+
+  it("magnet long_below must not set shortSqueezeArmed", () => {
+    const snap = computeCoil({
+      symbol: "BTC",
+      interval: "5m",
+      window: 48,
+      venue: "okx",
+      pack: pack({
+        bars: bars({ spot: 100, perp: 100.2, spotTakerBuy: 40, spotTakerSell: 60 }),
+        lsAccount: 1.1,
+        lsTop: 1.15,
+        funding: 0.0004,
+        fundingHistory: Array.from({ length: 20 }, () => 0.0004),
+      }),
+      liqFeed: {
+        status: "ok",
+        bins: [
+          { price: 99.2, usd: 3_000_000 },
+          { price: 100.4, usd: 800_000 },
+        ],
+      },
+    })
+    assert.equal(snap.liq.magnet, "long_below")
+    assert.equal(snap.squeeze.armed, false)
+    assert.equal(snap.squeeze.side === "short" && snap.squeeze.armed, false)
+  })
+
+  it("magnetFromBins ranks a 3× short pocket above", () => {
+    const mag = magnetFromBins(
+      [
+        { price: 100.8, usd: 3 },
+        { price: 99.2, usd: 1 },
+      ],
+      100,
+    )
+    assert.equal(mag.magnet, "short_above")
+    assert.equal(mag.shortAboveUsd, 3)
+  })
+
+  it("parseLiqMap reads CoinGlass pair-map shape", () => {
+    const bins = parseLiqMap({
+      code: "0",
+      data: { data: { "100.8": [[100.8, 1579370.77, 25, null]], "99.2": [[99.2, 400000, 10, null]] } },
+    })
+    assert.equal(bins.length, 2)
+    assert.equal(bins[0]?.usd, 1579370.77)
+  })
+
+  it("readLiq no_key stays null flags", () => {
+    const liq = readLiq({ status: "no_key", bins: [] }, 100, "short")
+    assert.equal(liq.available, false)
+    assert.equal(liq.magnet, "none")
+    assert.equal(liq.shortAboveUsd, null)
+  })
+})
+
 describe("weights", () => {
   it("layer weights still sum to 1.00", () => {
     const sum = WEIGHTS.crowd + WEIGHTS.fuel + WEIGHTS.spotLead + WEIGHTS.thinSession + WEIGHTS.mmFlow
@@ -417,6 +525,8 @@ describe("desk card", () => {
     assert.equal(typeof card.squeezeArmed, "boolean")
     assert.ok(card.squeezeSide === "short" || card.squeezeSide === "long" || card.squeezeSide === "none")
     assert.equal(card.crowdDisagrees, false)
+    assert.equal(card.liqAvailable, false)
+    assert.equal(card.liqMagnet, "none")
   })
 
   it("missing fields render as null, not a crash", () => {
@@ -433,8 +543,10 @@ describe("desk card", () => {
     assert.equal(card.squeezeSide, null)
     assert.equal(card.squeezeWatch, null)
     assert.equal(card.squeezeArmed, null)
-    assert.equal(card.lsPosition, null)
     assert.equal(card.crowdDisagrees, null)
+    assert.equal(card.liqAvailable, null)
+    assert.equal(card.liqMagnet, null)
+    assert.equal(card.liqAgainstCrowd, null)
     const empty = emptyDeskCard({ symbol: "ETH" })
     assert.equal(empty.symbol, "ETH")
     assert.equal(empty.score, null)
