@@ -15,6 +15,7 @@ AGENTS.project.md
 *.log
 .env
 .env.*
+!.env.example
 .project_id
 .node_modules.lock
 .DS_Store
